@@ -23,7 +23,7 @@ class Article(models.Model):
         default=False,
         help_text="If checked, the article is hidden; otherwise it is visible.",
     )
-    tag = models.ManyToManyField(Tag, related_name="tags", db_index=True)
+    tags = models.ManyToManyField(Tag, related_name="tags", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
