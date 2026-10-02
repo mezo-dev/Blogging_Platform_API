@@ -1,18 +1,32 @@
 from rest_framework import generics
+from rest_framework.permissions import SAFE_METHODS
 
 from .models import Article
-from .serializers import ArticleDetailSerializer, ArticleListSerializer
+from .permissions import IsStaffOrReadOnly
+from .serializers import (
+    ArticleDetailSerializer,
+    ArticleListSerializer,
+    ArticleWriteSerializer,
+)
 
 
-class VisibleArticlesMixin:
+class ArticleQuerysetMixin:
     def get_queryset(self):
-        return Article.objects.filter(is_visible=True).prefetch_related("tags")
+        articles = Article.objects.prefetch_related("tags")
+        if self.request.user.is_staff:
+            return articles
+        return articles.filter(is_visible=True)
 
 
-class ArticleListView(VisibleArticlesMixin, generics.ListAPIView):
+class ArticleListView(ArticleQuerysetMixin, generics.ListAPIView):
     serializer_class = ArticleListSerializer
 
 
-class ArticleDetailView(VisibleArticlesMixin, generics.RetrieveAPIView):
-    serializer_class = ArticleDetailSerializer
+class ArticleDetailView(ArticleQuerysetMixin, generics.RetrieveUpdateAPIView):
+    permission_classes = [IsStaffOrReadOnly]
     lookup_field = "uuid"
+
+    def get_serializer_class(self):
+        if self.request.method in SAFE_METHODS:
+            return ArticleDetailSerializer
+        return ArticleWriteSerializer

@@ -1,5 +1,6 @@
 from uuid import uuid7
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -72,3 +73,81 @@ class ArticleAPITests(APITestCase):
         response = self.client.get("/api/articles/1073cc2c/")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ArticleUpdateAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        User = get_user_model()
+        cls.staff = User.objects.create_user("editor", password="x", is_staff=True)
+        cls.user = User.objects.create_user("reader", password="x")
+        cls.tag = Tag.objects.create(name="django")
+        cls.article = Article.objects.create(
+            title="Original", content="Body", is_visible=True
+        )
+        cls.draft = Article.objects.create(
+            title="Draft", content="WIP", is_visible=False
+        )
+
+    def url(self, article):
+        return reverse("article-detail", kwargs={"uuid": article.uuid})
+
+    def test_anonymous_cannot_update(self):
+        response = self.client.patch(self.url(self.article), {"title": "Hacked"})
+
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.title, "Original")
+
+    def test_non_staff_cannot_update(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.patch(self.url(self.article), {"title": "Hacked"})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_can_update_and_gets_read_shape(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            self.url(self.article),
+            {"title": "Edited", "tags": [self.tag.id]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], "Edited")
+        self.assertEqual(response.data["tags"], [{"id": self.tag.id, "name": "django"}])
+
+    def test_staff_can_edit_and_publish_draft(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            self.url(self.draft), {"is_visible": True}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.draft.refresh_from_db()
+        self.assertTrue(self.draft.is_visible)
+
+    def test_duplicate_title_returns_400(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            self.url(self.article), {"title": "Draft"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("title", response.data)
+
+    def test_unknown_tag_returns_400(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.patch(
+            self.url(self.article), {"tags": [999]}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
