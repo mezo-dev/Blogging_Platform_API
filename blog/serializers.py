@@ -22,3 +22,9 @@ class ArticleSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class ArticleUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Article
+        fields = ["title", "content", "tags"]

@@ -4,9 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Article
-from .serializers import (
-    ArticleSerializer,
-)
+from .serializers import ArticleSerializer, ArticleUpdateSerializer
 
 
 class ArticleListView(APIView):
@@ -20,6 +18,17 @@ class ArticleDetailView(APIView):
     def get(self, request, uuid):
         article = get_object_or_404(Article, uuid=uuid)
         return Response(ArticleSerializer(article).data)
+
+
+class ArticleUpdateView(APIView):
+    def put(self, request, uuid):
+        article = get_object_or_404(Article, uuid=uuid)
+        serializer = ArticleUpdateSerializer(article, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            ArticleUpdateSerializer(article).data, status=status.HTTP_200_OK
+        )
 
 
 class ArticleDeleteView(APIView):
