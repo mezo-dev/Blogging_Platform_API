@@ -9,7 +9,7 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
-class ArticleListSerializer(serializers.ModelSerializer):
+class ArticleSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
